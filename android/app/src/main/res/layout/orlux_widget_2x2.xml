@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/orlux_widget_bg"
+    android:gravity="center"
+    android:orientation="vertical"
+    android:padding="12dp">
+
+    <TextView
+        android:id="@+id/brand"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:letterSpacing="0.18"
+        android:text="@string/orlux_widget_brand"
+        android:textAllCaps="true"
+        android:textColor="@color/orlux_aurora"
+        android:textSize="10sp"
+        android:textStyle="bold" />
+
+    <TextClock
+        android:id="@+id/digital_local"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:fontFamily="sans-serif-medium"
+        android:format12Hour="h:mm a"
+        android:format24Hour="HH:mm"
+        android:gravity="center"
+        android:maxLines="1"
+        android:textColor="@color/orlux_on_ink"
+        android:textSize="34sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/zone_label"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:ellipsize="end"
+        android:gravity="center"
+        android:maxLines="1"
+        android:textColor="@color/orlux_ice"
+        android:textSize="12sp" />
+
+    <LinearLayout
+        android:id="@+id/utc_row"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/utc_label"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/orlux_widget_utc"
+            android:textColor="@color/orlux_aurora"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <TextClock
+            android:id="@+id/digital_utc"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:format12Hour="h:mm a"
+            android:format24Hour="HH:mm"
+            android:textColor="@color/orlux_aurora"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:timeZone="UTC" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/event_row"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:gravity="center"
+        android:orientation="vertical">
+
+        <Chronometer
+            android:id="@+id/timer_chrono"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:textColor="@color/orlux_mint"
+            android:textSize="12sp"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/timer_name"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:gravity="center"
+            android:maxLines="1"
+            android:textColor="@color/orlux_on_ink"
+            android:textSize="11sp"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/alarm_line"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:gravity="center"
+            android:maxLines="1"
+            android:textColor="@color/orlux_ice"
+            android:textSize="11sp"
+            android:visibility="gone" />
+    </LinearLayout>
+
+    <FrameLayout
+        android:id="@+id/seconds_row"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp">
+
+        <AnalogClock
+            android:id="@+id/seconds_clock"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:layout_gravity="center"
+            android:dial="@drawable/orlux_seconds_dial"
+            android:hand_hour="@drawable/orlux_hand_empty"
+            android:hand_minute="@drawable/orlux_hand_empty"
+            android:hand_second="@drawable/orlux_second_hand" />
+    </FrameLayout>
+</LinearLayout>

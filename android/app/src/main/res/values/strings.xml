@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="orlux_widget_description">Centered local time, UTC, and the next timer or alarm</string>
+    <string name="orlux_widget_2x2_description">2×2 centered Orlux time with UTC</string>
+    <string name="orlux_widget_4x4_description">4×4 centered Orlux time, date, UTC, timer and alarm</string>
+    <string name="orlux_widget_label">Orlux 2×2</string>
+    <string name="orlux_widget_4x4_label">Orlux 4×4</string>
+    <string name="orlux_widget_brand">Orlux</string>
+    <string name="orlux_widget_utc">UTC</string>
+</resources>

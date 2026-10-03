@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="orlux_ink">#070B12</color>
+    <color name="orlux_card">#1A2333</color>
+    <color name="orlux_aurora">#E6C07B</color>
+    <color name="orlux_ice">#8BB8F0</color>
+    <color name="orlux_mint">#7EC8A3</color>
+    <color name="orlux_on_ink">#F3F1EA</color>
+</resources>
