@@ -19,6 +19,13 @@ class NativeAlerts {
     } catch (_) {}
   }
 
+  static Future<void> cancelIds(List<int> ids) async {
+    if (ids.isEmpty) return;
+    try {
+      await channel.invokeMethod<void>('cancelIds', ids);
+    } catch (_) {}
+  }
+
   static Future<void> snooze({
     required int id,
     required int minutes,

@@ -8,6 +8,7 @@ import '../services/clock_storage.dart';
 import '../theme.dart';
 import '../widgets/alert_sound_picker.dart';
 import '../widgets/edit_sheet_scaffold.dart';
+import '../widgets/sleep_edit_sheet.dart';
 import '../widgets/sleep_stats_card.dart';
 import '../widgets/wake_code_pad.dart';
 
@@ -88,6 +89,7 @@ class AlarmsScreenState extends State<AlarmsScreen> {
                 minute: 0,
               ),
           use24Hour: _use24Hour,
+          focusLabel: existing != null,
         );
       },
     );
@@ -100,6 +102,33 @@ class AlarmsScreenState extends State<AlarmsScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message)),
     );
+  }
+
+  Future<void> _editSleep([SleepNight? existing]) async {
+    final result = await showModalBottomSheet<SleepNightEdit>(
+      context: context,
+      backgroundColor: OrluxColors.card,
+      isScrollControlled: true,
+      useSafeArea: false,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return SleepEditSheet(
+          existing: existing,
+          use24Hour: _use24Hour,
+          takenDateKeys: _sleep.nights.map((night) => night.dateKey).toSet(),
+        );
+      },
+    );
+    if (result == null) return;
+    if (result.deleted) {
+      final key = result.dateKey;
+      if (key != null) await ClockStorage.deleteSleepNight(key);
+    } else if (result.night != null) {
+      await ClockStorage.upsertSleepNight(result.night!);
+    }
+    await reload();
   }
 
   @override
@@ -167,6 +196,9 @@ class AlarmsScreenState extends State<AlarmsScreen> {
                           stats: _sleep,
                           bedtimeSet: (_bedtimeMs ?? 0) > 0,
                           goalHours: _settings?.sleepGoalHours ?? 7.5,
+                          use24Hour: _use24Hour,
+                          onEditNight: _editSleep,
+                          onAddNight: () => _editSleep(),
                           onBedtime: () async {
                             await ClockStorage.markBedtime();
                             await reload();
@@ -176,12 +208,28 @@ class AlarmsScreenState extends State<AlarmsScreen> {
                             await reload();
                           },
                           onWake: () async {
-                            final night = await ClockStorage.endSleepSession();
+                            final result = await ClockStorage.wakeUp();
                             await reload();
                             if (!context.mounted) return;
-                            final message = night == null
-                                ? 'Mark Going to bed first, then tap I’m up in the morning.'
-                                : 'Logged ${night.hours.toStringAsFixed(1)} hours. Trends are on this card.';
+                            final night = result.night;
+                            final String message;
+                            if (night == null) {
+                              message =
+                                  'Mark Going to bed first, then tap I’m up in the morning.';
+                            } else if (result.stoppedRinging &&
+                                result.silencedAlarm) {
+                              message =
+                                  'Logged ${night.hours.toStringAsFixed(1)} hours. Alarm stopped, and the others set for today are off.';
+                            } else if (result.stoppedRinging) {
+                              message =
+                                  'Logged ${night.hours.toStringAsFixed(1)} hours. Alarm stopped.';
+                            } else if (night.skipped) {
+                              message =
+                                  'Logged ${night.hours.toStringAsFixed(1)} hours. Alarms set for today are off, and this night is marked skipped.';
+                            } else {
+                              message =
+                                  'Logged ${night.hours.toStringAsFixed(1)} hours. Trends are on this card.';
+                            }
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(content: Text(message)),
                             );
@@ -303,10 +351,12 @@ class _AlarmEditSheet extends StatefulWidget {
   const _AlarmEditSheet({
     required this.initial,
     required this.use24Hour,
+    this.focusLabel = false,
   });
 
   final ClockAlarm initial;
   final bool use24Hour;
+  final bool focusLabel;
 
   @override
   State<_AlarmEditSheet> createState() => _AlarmEditSheetState();
@@ -323,16 +373,18 @@ class _AlarmEditSheetState extends State<_AlarmEditSheet> {
     _alarm = widget.initial;
     _label = TextEditingController(text: _alarm.label);
     _labelFocus = FocusNode();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      Future<void>.delayed(const Duration(milliseconds: 280), () {
-        if (!mounted) return;
-        _labelFocus.requestFocus();
-        _label.selection = TextSelection(
-          baseOffset: 0,
-          extentOffset: _label.text.length,
-        );
+    if (widget.focusLabel) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Future<void>.delayed(const Duration(milliseconds: 280), () {
+          if (!mounted) return;
+          _labelFocus.requestFocus();
+          _label.selection = TextSelection(
+            baseOffset: 0,
+            extentOffset: _label.text.length,
+          );
+        });
       });
-    });
+    }
   }
 
   @override
@@ -366,6 +418,7 @@ class _AlarmEditSheetState extends State<_AlarmEditSheet> {
           TextField(
             controller: _label,
             focusNode: _labelFocus,
+            autofocus: false,
             textInputAction: TextInputAction.next,
             style: const TextStyle(color: Colors.white),
             decoration: const InputDecoration(labelText: 'Label'),
@@ -479,7 +532,7 @@ class _AlarmEditSheetState extends State<_AlarmEditSheet> {
             activeThumbColor: OrluxColors.aurora,
             title: const Text('Track sleep'),
             subtitle: const Text(
-              'Logs hours from Going to bed until you tap I’m up or stop this alarm.',
+              'Logs hours from Going to bed until you tap I’m up or stop this alarm. I’m up turns off alarms still set for today.',
             ),
             onChanged: (v) => setState(() {
               _alarm = _alarm.copyWith(trackSleep: v);

@@ -74,6 +74,22 @@ object NativeAlerts {
         AlertService.stop(context)
     }
 
+    fun cancelIds(context: Context, ids: List<Int>) {
+        val manager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        for (id in ids) {
+            val fire = Intent(context, AlertReceiver::class.java).apply {
+                action = ACTION_FIRE
+            }
+            val pi = PendingIntent.getBroadcast(
+                context,
+                id,
+                fire,
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+            )
+            manager.cancel(pi)
+        }
+    }
+
     fun stashPending(context: Context, payload: String) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .putString(KEY_PENDING, payload)
