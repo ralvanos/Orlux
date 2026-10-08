@@ -121,6 +121,26 @@ void main() {
     expect(stats.averageHours, closeTo(7.0, 0.01));
     expect(stats.latest!.hours, 6);
     expect(stats.latest!.shortLabel, 'Sep 21');
+    expect(stats.last7, hasLength(2));
+    expect(stats.chronological.first.dateKey, '2026-09-20');
+  });
+
+  test('sleep list keeps a week while the chart keeps every night', () {
+    final nights = [
+      for (var day = 1; day <= 10; day++)
+        SleepNight(
+          dateKey: '2026-09-${day.toString().padLeft(2, '0')}',
+          minutes: 400,
+          bedtimeMs: 1,
+          wakeMs: 2,
+        ),
+    ];
+    final stats = SleepStats(nights: nights.reversed.toList());
+    expect(stats.chronological, hasLength(10));
+    expect(stats.chronological.first.dateKey, '2026-09-01');
+    expect(stats.last7, hasLength(7));
+    expect(stats.last7.first.dateKey, '2026-09-04');
+    expect(stats.last7.last.dateKey, '2026-09-10');
   });
 
   test('formatHms uses hours minutes and seconds', () {
@@ -349,6 +369,146 @@ void main() {
   test('auto-lock immediate on pause', () {
     expect(AutoLockPolicy.lockImmediatelyOnPause(0), isTrue);
     expect(AutoLockPolicy.lockImmediatelyOnPause(30), isFalse);
+  });
+
+  test('a gap between sleep stretches is not counted', () {
+    final wakeDay = DateTime(2026, 10, 8);
+    final first = SleepSpan.onWakeDay(
+      wakeDay: wakeDay,
+      startHour: 23,
+      startMinute: 0,
+      endHour: 2,
+      endMinute: 0,
+    );
+    final second = SleepSpan.onWakeDay(
+      wakeDay: wakeDay,
+      startHour: 5,
+      startMinute: 0,
+      endHour: 7,
+      endMinute: 30,
+    );
+    expect(first, isNotNull);
+    expect(second, isNotNull);
+    expect(
+      DateTime.fromMillisecondsSinceEpoch(first!.startMs),
+      DateTime(2026, 10, 7, 23),
+    );
+    expect(
+      DateTime.fromMillisecondsSinceEpoch(first.endMs),
+      DateTime(2026, 10, 8, 2),
+    );
+    expect(
+      DateTime.fromMillisecondsSinceEpoch(second!.startMs),
+      DateTime(2026, 10, 8, 5),
+    );
+    final night = SleepNight.fromSpans(
+      dateKey: '2026-10-08',
+      spans: [first, second],
+      skipped: true,
+    );
+    expect(night.minutes, 5 * 60 + 30);
+    expect(night.hours, closeTo(5.5, 0.01));
+    expect(night.spans, hasLength(2));
+    expect(night.skipped, isTrue);
+    final restored = SleepNight.fromJson(night.toJson());
+    expect(restored.minutes, night.minutes);
+    expect(restored.spans, hasLength(2));
+    expect(restored.resolvedSpans.first.startMs, first.startMs);
+  });
+
+  test('bedtime after midnight stays on the wake morning', () {
+    final span = SleepSpan.onWakeDay(
+      wakeDay: DateTime(2026, 10, 8),
+      startHour: 1,
+      startMinute: 15,
+      endHour: 7,
+      endMinute: 0,
+    );
+    expect(
+      DateTime.fromMillisecondsSinceEpoch(span!.startMs),
+      DateTime(2026, 10, 8, 1, 15),
+    );
+    expect(span.minutes, 5 * 60 + 45);
+    expect(
+      SleepSpan.onWakeDay(
+        wakeDay: DateTime(2026, 10, 8),
+        startHour: 7,
+        startMinute: 0,
+        endHour: 7,
+        endMinute: 0,
+      ),
+      isNull,
+    );
+  });
+
+  test('overlapping sleep stretches combine instead of double counting', () {
+    final merged = SleepSpan.merge([
+      SleepSpan(startMs: 50 * 60000, endMs: 120 * 60000),
+      SleepSpan(startMs: 0, endMs: 80 * 60000),
+    ]);
+    expect(merged, hasLength(1));
+    expect(merged.first.minutes, 120);
+  });
+
+  test('older sleep logs without stretches still use bedtime and wake', () {
+    final night = SleepNight.fromJson({
+      'dateKey': '2026-10-08',
+      'minutes': 90,
+      'bedtimeMs': 1000,
+      'wakeMs': 1000 + 90 * 60000,
+      'skipped': true,
+    });
+    expect(night.spans, isEmpty);
+    expect(night.resolvedSpans, hasLength(1));
+    expect(night.resolvedSpans.first.minutes, 90);
+    expect(night.skipped, isTrue);
+  });
+
+  test('I’m up turns off every alarm still due today', () {
+    final now = DateTime(2026, 10, 8, 6);
+    final sleep = ClockAlarm(
+      id: 'sleep',
+      label: 'Morning',
+      hour: 7,
+      minute: 0,
+      trackSleep: true,
+    );
+    final afternoon = ClockAlarm(
+      id: 'later',
+      label: 'Afternoon',
+      hour: 15,
+      minute: 0,
+    );
+    final alreadyPassed = ClockAlarm(
+      id: 'early',
+      label: 'Early',
+      hour: 5,
+      minute: 0,
+    );
+    final silenced = ClockMath.alarmsSilencedByWake(
+      [afternoon, alreadyPassed, sleep],
+      nowFor: (_) => now,
+    );
+    expect(silenced.map((alarm) => alarm.id), ['sleep', 'later']);
+  });
+
+  test('I’m up turns off every alarm still set for today', () {
+    final now = DateTime(2026, 10, 8, 6);
+    final seven = ClockAlarm(id: '7', label: 'A', hour: 7, minute: 30);
+    final nine = ClockAlarm(id: '9', label: 'B', hour: 9, minute: 0);
+    final silenced = ClockMath.alarmsSilencedByWake(
+      [nine, seven],
+      nowFor: (_) => now,
+    );
+    expect(silenced.map((alarm) => alarm.id), ['7', '9']);
+    expect(
+      ClockMath.alarmsSilencedByWake(
+        [seven],
+        nowFor: (_) => now,
+        exceptId: '7',
+      ),
+      isEmpty,
+    );
   });
 
   test('export crypto round-trip', () {

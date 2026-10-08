@@ -51,6 +51,12 @@ class MainActivity : FlutterActivity() {
                     NativeAlerts.stop(this)
                     result.success(null)
                 }
+                "cancelIds" -> {
+                    val raw = call.arguments as? List<*> ?: emptyList<Any>()
+                    val ids = raw.mapNotNull { (it as? Number)?.toInt() }
+                    NativeAlerts.cancelIds(this, ids)
+                    result.success(null)
+                }
                 "snooze" -> {
                     val args = call.arguments as? Map<*, *>
                     val intent = Intent().apply {

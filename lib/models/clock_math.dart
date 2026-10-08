@@ -161,4 +161,26 @@ class ClockMath {
     }
     return 'Alarm set for ${parts[0]}, ${parts[1]} and ${parts[2]} from now';
   }
+
+  /// Every enabled alarm that would still ring today.
+  /// I’m up turns each of these off for that day.
+  static List<ClockAlarm> alarmsSilencedByWake(
+    List<ClockAlarm> alarms, {
+    required DateTime Function(ClockAlarm alarm) nowFor,
+    String? exceptId,
+  }) {
+    final due = <ClockAlarm>[];
+    for (final alarm in alarms) {
+      if (!alarm.enabled || alarm.id == exceptId) continue;
+      final now = nowFor(alarm);
+      final next = nextAlarmAt(alarm, now: now);
+      if (dateKey(next) == dateKey(now)) due.add(alarm);
+    }
+    due.sort((a, b) {
+      final aNext = nextAlarmAt(a, now: nowFor(a));
+      final bNext = nextAlarmAt(b, now: nowFor(b));
+      return aNext.compareTo(bNext);
+    });
+    return due;
+  }
 }

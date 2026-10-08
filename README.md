@@ -1,6 +1,6 @@
 # Orlux
 
-**Version:** 1.0.0+1  
+**Version:** 1.1.0+2  
 **Package:** `com.io.github.com.ralvanos.orlux`  
 **Platform:** Android only
 
@@ -15,7 +15,7 @@ An **offline** clock. Orlux shows UTC and a timezone you choose, then adds stopw
 * **Alarms** — named times, repeat days, local or UTC, snooze, skip today, skip US federal holidays, per-alarm sound, optional wake code to stop
 * **Closed-app alerts** — native `AlarmManager` plus a foreground service so timers and alarms still ring when Orlux is not open; Stop on the overlay or notification ends the tone
 * **Home-screen widgets** — compact watch and a larger 4×4 face (time is not animated second-by-second)
-* **Sleep hours** — turn on track sleep, tap **Going to bed**, then **I’m up** (or stop / skip the alarm). Averages, a 14-night chart, and dated nights live on the Alarms tab
+* **Sleep hours** — turn on track sleep, tap **Going to bed**, then **I’m up**. **I’m up** logs the night, turns off every alarm still set for that day, and marks the night skipped. Edit a night from the latest week with a fell-asleep and woke time, and add another stretch if you were awake in the middle. The chart keeps every saved night; the average uses the last 14
 * **Bedtime reminder**, optional volume crescendo, haptics, and click sounds
 * **On-device encryption** and import / export JSON (optional PIN-protect on export)
 
@@ -35,9 +35,16 @@ Release APK:
 flutter build apk --release
 ```
 
-Output: `build/app/outputs/flutter-apk/app-release.apk` (gitignored).
+Output: `build/app/outputs/flutter-apk/app-release.apk` (gitignored). The version name and Android version code come from `pubspec.yaml` (`1.1.0+2`).
 
 Release signing uses `android/key.properties` and a keystore file such as `android/app/orlux.jks`. Both are gitignored. Copy `android/key.properties.example` to `android/key.properties` and fill in your own store. Debug builds work without it.
+
+## Tested on
+
+1.1.0 was tested on:
+
+- Samsung Galaxy S23
+- Google Pixel 8
 
 ## Privacy
 

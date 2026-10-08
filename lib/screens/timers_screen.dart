@@ -508,20 +508,6 @@ class _TimerEditSheetState extends State<_TimerEditSheet> {
     _alertOnDelayEnd = existing?.alertOnDelayEnd ?? true;
     _chainId = existing?.onCompleteStartId;
     _soundId = existing?.soundId;
-    // New timers start with the name selected. Editing an existing timer
-    // leaves the keyboard down until the name field is tapped.
-    if (existing == null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        Future<void>.delayed(const Duration(milliseconds: 280), () {
-          if (!mounted) return;
-          _nameFocus.requestFocus();
-          _nameCtrl.selection = TextSelection(
-            baseOffset: 0,
-            extentOffset: _nameCtrl.text.length,
-          );
-        });
-      });
-    }
   }
 
   @override
@@ -611,6 +597,7 @@ class _TimerEditSheetState extends State<_TimerEditSheet> {
           TextField(
             controller: _nameCtrl,
             focusNode: _nameFocus,
+            autofocus: false,
             textInputAction: TextInputAction.next,
             style: const TextStyle(color: Colors.white),
             decoration: const InputDecoration(labelText: 'Name'),

@@ -1170,14 +1170,73 @@ class ClockStorage {
   static Future<void> skipToday(ClockAlarm alarm) async {
     final settings = await getSettings();
     final wall = alarm.useUtc ? DateTime.now().toUtc() : wallNow(settings);
+    await _silenceUntilNext(alarm);
+    await _logSleep(alarm, skipped: true, wake: wall);
+  }
+
+  /// Turns off the next ring without logging sleep.
+  static Future<void> _silenceUntilNext(ClockAlarm alarm) async {
+    final settings = await getSettings();
+    final wall = alarm.useUtc ? DateTime.now().toUtc() : wallNow(settings);
     if (!alarm.repeats) {
       await upsertAlarm(alarm.copyWith(enabled: false));
-      await _logSleep(alarm, skipped: true, wake: wall);
-      return;
+    } else {
+      final next = ClockMath.nextAlarmAt(alarm, now: wall);
+      await upsertAlarm(alarm.copyWith(skipDate: ClockMath.dateKey(next)));
     }
-    final next = ClockMath.nextAlarmAt(alarm, now: wall);
-    await upsertAlarm(alarm.copyWith(skipDate: ClockMath.dateKey(next)));
-    await _logSleep(alarm, skipped: true, wake: wall);
+    await _notifications.cancel(id: _snoozeNotifId(alarm.id));
+    await NativeAlerts.cancelIds([_snoozeNotifId(alarm.id)]);
+  }
+
+  /// Logs the night and turns off an alarm that has not rung yet.
+  /// Waking before that alarm marks the night skipped.
+  static Future<WakeUpResult> wakeUp() async {
+    final settings = await getSettings();
+    final alarms = await getAlarms();
+    final ringing = AlarmRing.instance.ringing.value;
+    final nowLocal = wallNow(settings);
+    final nowUtc = DateTime.now().toUtc();
+    final silence = ClockMath.alarmsSilencedByWake(
+      alarms,
+      nowFor: (alarm) => alarm.useUtc ? nowUtc : nowLocal,
+      exceptId: ringing?.id,
+    );
+    for (final alarm in silence) {
+      await _silenceUntilNext(alarm);
+    }
+    for (final alarm in alarms) {
+      await _notifications.cancel(id: _snoozeNotifId(alarm.id));
+    }
+    await NativeAlerts.cancelIds([
+      for (final alarm in alarms) _snoozeNotifId(alarm.id),
+    ]);
+    if (ringing != null) {
+      await stopRingingAlarm();
+    }
+    final pending = await pendingBedtimeMs();
+    if (pending != null && pending > 0) {
+      final night = await endSleepSession(
+        skipped: ringing == null && silence.isNotEmpty,
+      );
+      return WakeUpResult(
+        night: night,
+        silencedAlarm: silence.isNotEmpty,
+        stoppedRinging: ringing != null,
+      );
+    }
+    final key = ClockMath.dateKey(
+      ringing?.useUtc == true ? nowUtc : nowLocal,
+    );
+    final nights = await getSleepNights();
+    SleepNight? logged;
+    for (final item in nights) {
+      if (item.dateKey == key) logged = item;
+    }
+    return WakeUpResult(
+      night: logged,
+      silencedAlarm: silence.isNotEmpty,
+      stoppedRinging: ringing != null,
+    );
   }
 
   static Future<void> markBedtime() async {
@@ -1224,6 +1283,30 @@ class ClockStorage {
     }
   }
 
+  static Future<void> upsertSleepNight(SleepNight night) async {
+    final nights = await getSleepNights();
+    nights.removeWhere((item) => item.dateKey == night.dateKey);
+    nights.add(night);
+    await _writeSleepNights(nights);
+  }
+
+  static Future<void> deleteSleepNight(String dateKey) async {
+    final nights = await getSleepNights();
+    nights.removeWhere((item) => item.dateKey == dateKey);
+    await _writeSleepNights(nights);
+  }
+
+  static Future<void> _writeSleepNights(List<SleepNight> nights) async {
+    nights.sort((a, b) => a.dateKey.compareTo(b.dateKey));
+    final trimmed =
+        nights.length > 60 ? nights.sublist(nights.length - 60) : nights;
+    await _store.setString(
+      keySleepNights,
+      jsonEncode(trimmed.map((night) => night.toJson()).toList()),
+    );
+    sleepRevision.value++;
+  }
+
   static Future<SleepNight?> _logSleep(
     ClockAlarm? alarm, {
     required bool skipped,
@@ -1252,9 +1335,13 @@ class ClockStorage {
     } else {
       return null;
     }
-    var minutes = now.difference(bedtime).inMinutes;
+    var end = now;
+    var minutes = end.difference(bedtime).inMinutes;
     if (minutes < 1) return null;
-    if (minutes > 24 * 60) minutes = 24 * 60;
+    if (minutes > 24 * 60) {
+      minutes = 24 * 60;
+      end = bedtime.add(Duration(minutes: minutes));
+    }
     final nights = await getSleepNights();
     final key = ClockMath.dateKey(now);
     nights.removeWhere((n) => n.dateKey == key);
@@ -1262,20 +1349,19 @@ class ClockStorage {
       dateKey: key,
       minutes: minutes,
       bedtimeMs: bedtime.millisecondsSinceEpoch,
-      wakeMs: now.millisecondsSinceEpoch,
+      wakeMs: end.millisecondsSinceEpoch,
       alarmId: alarm?.id,
       skipped: skipped,
+      spans: [
+        SleepSpan(
+          startMs: bedtime.millisecondsSinceEpoch,
+          endMs: end.millisecondsSinceEpoch,
+        ),
+      ],
     );
     nights.add(night);
-    nights.sort((a, b) => a.dateKey.compareTo(b.dateKey));
-    final trimmed =
-        nights.length > 60 ? nights.sublist(nights.length - 60) : nights;
-    await _store.setString(
-      keySleepNights,
-      jsonEncode(trimmed.map((n) => n.toJson()).toList()),
-    );
     await _store.setInt(keyBedtimeMs, 0);
-    sleepRevision.value++;
+    await _writeSleepNights(nights);
     return night;
   }
 
